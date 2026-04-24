@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meta Ads Dashboard</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f6f8;
+      color: #111827;
+    }
+
+    .app {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 230px;
+      background: #ffffff;
+      border-right: 1px solid #e5e7eb;
+      padding: 20px;
+    }
+
+    .brand {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 28px;
+    }
+
+    .nav-item {
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      color: #4b5563;
+      font-size: 14px;
+    }
+
+    .nav-item.active {
+      background: #e8f1ff;
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    .main {
+      flex: 1;
+      padding: 24px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: 160px 160px 260px 120px;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    input,
+    select,
+    button {
+      height: 38px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 0 10px;
+      background: white;
+      font-size: 14px;
+    }
+
+    button {
+      cursor: pointer;
+      background: #111827;
+      color: white;
+      border: none;
+      font-weight: 700;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    .card-label {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+
+    .card-value {
+      font-size: 26px;
+      font-weight: 800;
+    }
+
+    .panel {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 18px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+
+    .chart-wrap {
+      height: 300px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 10px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: #6b7280;
+      font-weight: 700;
+      background: #f9fafb;
+    }
+
+    .right {
+      text-align: right;
+    }
+
+    .muted {
+      color: #6b7280;
+      font-size: 13px;
+    }
+
+    .status {
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    @media (max-width: 1100px) {
+      .cards,
+      .grid-2,
+      .filters {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">EcomProfits</div>
+      <div class="nav-item active">Meta Ads</div>
+      <div class="nav-item">P&L</div>
+      <div class="nav-item">Shopify</div>
+      <div class="nav-item">Product P&L</div>
+      <div class="nav-item">Settings</div>
+    </aside>
+
+    <main class="main">
+      <div class="header">
+        <div>
+          <h1>Meta Ads Dashboard</h1>
+          <div class="muted">Spend data from Supabase</div>
+        </div>
+      </div>
+
+      <div class="filters">
+        <input type="date" id="startDate" />
+        <input type="date" id="endDate" />
+        <select id="accountFilter">
+          <option value="">All accounts</option>
+        </select>
+        <button onclick="loadDashboard()">Refresh</button>
+      </div>
+
+      <div class="status" id="status">Ready</div>
+
+      <section class="cards">
+        <div class="card">
+          <div class="card-label">Total Spend</div>
+          <div class="card-value" id="totalSpend">€0.00</div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">Accounts</div>
+          <div class="card-value" id="totalAccounts">0</div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">Campaigns</div>
+          <div class="card-value" id="totalCampaigns">0</div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">Ads With Spend</div>
+          <div class="card-value" id="totalAds">0</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Spend by Day</h2>
+        <div class="chart-wrap">
+          <canvas id="spendChart"></canvas>
+        </div>
+      </section>
+
+      <section class="grid-2">
+        <div class="panel">
+          <h2>Spend by Account</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th class="right">Spend</th>
+              </tr>
+            </thead>
+            <tbody id="accountTable"></tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <h2>Spend by Campaign</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Campaign</th>
+                <th>Account</th>
+                <th class="right">Spend</th>
+              </tr>
+            </thead>
+            <tbody id="campaignTable"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://pddiurfztdxieyonxlcp.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZGl1cmZ6dGR4aWV5b254bGNwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzAzOTkxMywiZXhwIjoyMDkyNjE1OTEzfQ.YSEkDz5fAQsuw25rZQ6xXHb6u6Y9eNrWMG6vSBlUKUk";
+
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let spendChart = null;
+    let latestRows = [];
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      setDefaultDates();
+      await loadAccounts();
+      await loadDashboard();
+    });
+
+    function setDefaultDates() {
+      const end = new Date();
+      const start = new Date();
+
+      start.setDate(start.getDate() - 7);
+
+      document.getElementById("startDate").value = toDateInput(start);
+      document.getElementById("endDate").value = toDateInput(end);
+    }
+
+    function toDateInput(date) {
+      return date.toISOString().slice(0, 10);
+    }
+
+    async function loadAccounts() {
+      setStatus("Loading accounts...");
+
+      const { data, error } = await supabaseClient
+        .from("meta_ads_daily_view")
+        .select("account_id, account_name")
+        .order("account_name", { ascending: true });
+
+      if (error) {
+        console.error(error);
+        setStatus("Error loading accounts: " + error.message);
+        return;
+      }
+
+      const map = new Map();
+
+      (data || []).forEach(row => {
+        if (!row.account_id) return;
+        map.set(row.account_id, row.account_name || row.account_id);
+      });
+
+      const select = document.getElementById("accountFilter");
+
+      Array.from(map.entries()).forEach(([id, name]) => {
+        const option = document.createElement("option");
+        option.value = id;
+        option.textContent = name;
+        select.appendChild(option);
+      });
+
+      setStatus("Accounts loaded");
+    }
+
+    async function loadDashboard() {
+      const startDate = document.getElementById("startDate").value;
+      const endDate = document.getElementById("endDate").value;
+      const accountId = document.getElementById("accountFilter").value;
+
+      setStatus("Loading dashboard...");
+
+      let query = supabaseClient
+        .from("meta_ads_daily_view")
+        .select("*")
+        .gte("spend_date", startDate)
+        .lte("spend_date", endDate)
+        .gt("spend", 0)
+        .order("spend_date", { ascending: true });
+
+      if (accountId) {
+        query = query.eq("account_id", accountId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error(error);
+        setStatus("Error loading dashboard: " + error.message);
+        return;
+      }
+
+      latestRows = data || [];
+
+      renderCards(latestRows);
+      renderChart(latestRows);
+      renderAccountTable(latestRows);
+      renderCampaignTable(latestRows);
+
+      setStatus(`Loaded ${latestRows.length} rows`);
+    }
+
+    function renderCards(rows) {
+      const totalSpend = sum(rows, "spend");
+      const accounts = unique(rows.map(row => row.account_id)).length;
+      const campaigns = unique(rows.map(row => row.campaign_name)).length;
+      const ads = unique(rows.map(row => row.ad_id)).length;
+
+      document.getElementById("totalSpend").textContent = formatCurrency(totalSpend);
+      document.getElementById("totalAccounts").textContent = accounts;
+      document.getElementById("totalCampaigns").textContent = campaigns;
+      document.getElementById("totalAds").textContent = ads;
+    }
+
+    function renderChart(rows) {
+      const byDate = groupSum(rows, row => row.spend_date, row => Number(row.spend || 0));
+      const labels = Object.keys(byDate).sort();
+      const values = labels.map(date => byDate[date]);
+
+      const ctx = document.getElementById("spendChart");
+
+      if (spendChart) {
+        spendChart.destroy();
+      }
+
+      spendChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "Spend",
+              data: values,
+              tension: 0.35,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+
+    function renderAccountTable(rows) {
+      const byAccount = {};
+
+      rows.forEach(row => {
+        const key = row.account_id || "unknown";
+
+        if (!byAccount[key]) {
+          byAccount[key] = {
+            account_name: row.account_name || key,
+            spend: 0
+          };
+        }
+
+        byAccount[key].spend += Number(row.spend || 0);
+      });
+
+      const sorted = Object.values(byAccount)
+        .sort((a, b) => b.spend - a.spend);
+
+      const html = sorted.map(row => `
+        <tr>
+          <td>${escapeHtml(row.account_name)}</td>
+          <td class="right">${formatCurrency(row.spend)}</td>
+        </tr>
+      `).join("");
+
+      document.getElementById("accountTable").innerHTML =
+        html || `<tr><td colspan="2">No data</td></tr>`;
+    }
+
+    function renderCampaignTable(rows) {
+      const byCampaign = {};
+
+      rows.forEach(row => {
+        const key = [
+          row.account_id || "",
+          row.campaign_name || ""
+        ].join("|");
+
+        if (!byCampaign[key]) {
+          byCampaign[key] = {
+            campaign_name: row.campaign_name || "No campaign name",
+            account_name: row.account_name || "",
+            spend: 0
+          };
+        }
+
+        byCampaign[key].spend += Number(row.spend || 0);
+      });
+
+      const sorted = Object.values(byCampaign)
+        .sort((a, b) => b.spend - a.spend)
+        .slice(0, 50);
+
+      const html = sorted.map(row => `
+        <tr>
+          <td>${escapeHtml(row.campaign_name)}</td>
+          <td>${escapeHtml(row.account_name)}</td>
+          <td class="right">${formatCurrency(row.spend)}</td>
+        </tr>
+      `).join("");
+
+      document.getElementById("campaignTable").innerHTML =
+        html || `<tr><td colspan="3">No data</td></tr>`;
+    }
+
+    function sum(rows, field) {
+      return rows.reduce((total, row) => total + Number(row[field] || 0), 0);
+    }
+
+    function unique(values) {
+      return Array.from(new Set(values.filter(Boolean)));
+    }
+
+    function groupSum(rows, keyFn, valueFn) {
+      return rows.reduce((acc, row) => {
+        const key = keyFn(row);
+        acc[key] = (acc[key] || 0) + valueFn(row);
+        return acc;
+      }, {});
+    }
+
+    function formatCurrency(value) {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "EUR"
+      }).format(Number(value || 0));
+    }
+
+    function setStatus(message) {
+      document.getElementById("status").textContent = message;
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+  </script>
+</body>
+</html>
