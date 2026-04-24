@@ -286,7 +286,13 @@
 
   <script>
     const SUPABASE_URL = "https://pddiurfztdxieyonxlcp.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZGl1cmZ6dGR4aWV5b254bGNwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzAzOTkxMywiZXhwIjoyMDkyNjE1OTEzfQ.YSEkDz5fAQsuw25rZQ6xXHb6u6Y9eNrWMG6vSBlUKUk";
+
+    // IMPORTANT:
+    // Replace this with your real Supabase anon public key.
+    // Do not use the service_role key in frontend code.
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZGl1cmZ6dGR4aWV5b254bGNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzk5MTMsImV4cCI6MjA5MjYxNTkxM30.5Dx9LRx4X2LK9exyIGErozAHzJYbo2rni544sp4tjYc";
+
+    const SUPABASE_TABLE = "ad_spend_daily";
 
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -317,8 +323,9 @@
       setStatus("Loading accounts...");
 
       const { data, error } = await supabaseClient
-        .from("meta_ads_daily_view")
+        .from(SUPABASE_TABLE)
         .select("account_id, account_name")
+        .gt("spend", 0)
         .order("account_name", { ascending: true });
 
       if (error) {
@@ -331,10 +338,12 @@
 
       (data || []).forEach(row => {
         if (!row.account_id) return;
-        map.set(row.account_id, row.account_name || row.account_id);
+        map.set(String(row.account_id), row.account_name || row.account_id);
       });
 
       const select = document.getElementById("accountFilter");
+
+      select.innerHTML = `<option value="">All accounts</option>`;
 
       Array.from(map.entries()).forEach(([id, name]) => {
         const option = document.createElement("option");
@@ -354,7 +363,7 @@
       setStatus("Loading dashboard...");
 
       let query = supabaseClient
-        .from("meta_ads_daily_view")
+        .from(SUPABASE_TABLE)
         .select("*")
         .gte("spend_date", startDate)
         .lte("spend_date", endDate)
@@ -396,7 +405,12 @@
     }
 
     function renderChart(rows) {
-      const byDate = groupSum(rows, row => row.spend_date, row => Number(row.spend || 0));
+      const byDate = groupSum(
+        rows,
+        row => row.spend_date,
+        row => Number(row.spend || 0)
+      );
+
       const labels = Object.keys(byDate).sort();
       const values = labels.map(date => byDate[date]);
 
@@ -440,7 +454,7 @@
       const byAccount = {};
 
       rows.forEach(row => {
-        const key = row.account_id || "unknown";
+        const key = String(row.account_id || "unknown");
 
         if (!byAccount[key]) {
           byAccount[key] = {
